@@ -1,5 +1,4 @@
--- Ryzen Hub v3 | [FPS] Flick
--- Aimbot (E) + Skeleton ESP + God Mode + Aim FOV
+-- Ryzen Hub v3 | [FPS] Flick (Skeleton Fix + Box ESP)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -34,7 +33,6 @@ Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.Parent = Main
 
--- ================= Кнопки =================
 local function makeButton(text, y)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, 35)
@@ -51,7 +49,7 @@ local function makeButton(text, y)
     return btn
 end
 
-local ESPBtn    = makeButton("ESP Skeleton: OFF", 45)
+local ESPBtn    = makeButton("ESP: OFF", 45)
 local AimbotBtn = makeButton("Aimbot (E): OFF", 90)
 local GodBtn    = makeButton("God Mode: OFF", 135)
 local AimFOVBtn = makeButton("Aim FOV: 100", 180)
@@ -68,134 +66,109 @@ Status.TextSize = 12
 Status.TextWrapped = true
 Status.Parent = Main
 
--- ================= SKELETON ESP =================
--- Скелет: соединяем ключевые точки персонажа линиями
+-- ================= ESP (Highlight + BillboardGui) =================
 local espEnabled = false
-local espDrawings = {} -- [player] = {lines}
-local espLastUpdate = 0
+local espObjects = {} -- [player] = {highlight, billboard, box}
 
--- Кости скелета (пары частей для соединения)
-local skeletonPairs = {
-    {"Head", "Torso"},
-    {"Torso", "Left Arm"},
-    {"Torso", "Right Arm"},
-    {"Torso", "Left Leg"},
-    {"Torso", "Right Leg"},
-    {"Left Arm", "Left Leg"},
-    {"Right Arm", "Right Leg"},
-}
-
-local function getPart(char, name)
-    -- Совместимость R6 / R15
-    local map = {
-        ["Torso"] = {"Torso", "UpperTorso", "LowerTorso"},
-        ["Left Arm"] = {"Left Arm", "LeftUpperArm", "LeftLowerArm", "LeftHand"},
-        ["Right Arm"] = {"Right Arm", "RightUpperArm", "RightLowerArm", "RightHand"},
-        ["Left Leg"] = {"Left Leg", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot"},
-        ["Right Leg"] = {"Right Leg", "RightUpperLeg", "RightLowerLeg", "RightFoot"},
-        ["Head"] = {"Head"},
-    }
-    for _, n in ipairs(map[name] or {name}) do
-        local p = char:FindFirstChild(n)
-        if p then return p end
+local function removeESP(player)
+    if espObjects[player] then
+        for _, obj in ipairs(espObjects[player]) do
+            if obj and obj.Parent then obj:Destroy() end
+        end
+        espObjects[player] = nil
     end
-    return nil
 end
 
-local function createSkeleton(player)
+local function createESP(player)
     if player == LocalPlayer then return end
     local char = player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return end
 
-    -- Удалить старый
-    if espDrawings[player] then
-        for _, line in ipairs(espDrawings[player]) do
-            if line then line:Remove() end
-        end
-    end
+    removeESP(player)
 
-    local lines = {}
-    for _, pair in ipairs(skeletonPairs) do
-        local p1 = getPart(char, pair[1])
-        local p2 = getPart(char, pair[2])
-        if p1 and p2 then
-            local line = Drawing.new("Line")
-            line.Color = Color3.fromRGB(0, 255, 100)
-            line.Thickness = 1.5
-            line.Transparency = 1
-            line.Visible = false
-            table.insert(lines, line)
-        else
-            table.insert(lines, nil)
-        end
-    end
-    espDrawings[player] = lines
+    local objects = {}
+
+    -- Highlight (подсветка)
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = char
+    highlight.FillColor = Color3.fromRGB(0, 255, 100)
+    highlight.OutlineColor = Color3.fromRGB(0, 255, 100)
+    highlight.FillTransparency = 0.7
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = char
+    table.insert(objects, highlight)
+
+    -- BillboardGui (имя + дистанция)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = char:FindFirstChild("Head") or char
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0, 20)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 14
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.Parent = billboard
+    table.insert(objects, billboard)
+
+    espObjects[player] = objects
 end
 
-local function updateSkeleton()
-    for player, lines in pairs(espDrawings) do
-        local char = player.Character
-        if not char or not char:FindFirstChildOfClass("Humanoid") or char.Humanoid.Health <= 0 then
-            for _, line in ipairs(lines) do
-                if line then line.Visible = false end
-            end
-        else
-            local idx = 1
-            for _, pair in ipairs(skeletonPairs) do
-                local line = lines[idx]
-                if line then
-                    local p1 = getPart(char, pair[1])
-                    local p2 = getPart(char, pair[2])
-                    if p1 and p2 then
-                        local v1, on1 = Camera:WorldToViewportPoint(p1.Position)
-                        local v2, on2 = Camera:WorldToViewportPoint(p2.Position)
-                        if on1 and on2 then
-                            line.From = Vector2.new(v1.X, v1.Y)
-                            line.To = Vector2.new(v2.X, v2.Y)
-                            line.Visible = true
-                        else
-                            line.Visible = false
-                        end
-                    else
-                        line.Visible = false
-                    end
-                end
-                idx = idx + 1
-            end
-        end
+local function clearAllESP()
+    for player, _ in pairs(espObjects) do
+        removeESP(player)
     end
-end
-
-local function clearSkeleton()
-    for _, lines in pairs(espDrawings) do
-        for _, line in ipairs(lines) do
-            if line then line:Remove() end
-        end
-    end
-    espDrawings = {}
+    espObjects = {}
 end
 
 local function toggleESP()
     espEnabled = not espEnabled
-    ESPBtn.Text = "ESP Skeleton: " .. (espEnabled and "ON" or "OFF")
+    ESPBtn.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
     if espEnabled then
-        Status.Text = "Skeleton ESP включён"
-        -- Создать скелеты для всех
-        for _, p in ipairs(Players:GetPlayers()) do createSkeleton(p) end
-        Players.PlayerAdded:Connect(createSkeleton)
-        Players.PlayerRemoving:Connect(function(p)
-            if espDrawings[p] then
-                for _, line in ipairs(espDrawings[p]) do
-                    if line then line:Remove() end
+        Status.Text = "ESP включён"
+        for _, p in ipairs(Players:GetPlayers()) do createESP(p) end
+
+        -- Обновление при добавлении игроков
+        Players.PlayerAdded:Connect(function(p)
+            task.wait(1)
+            if espEnabled then createESP(p) end
+        end)
+
+        -- Обновление при респавне
+        Players.PlayerAdded:Connect(function(p)
+            p.CharacterAdded:Connect(function()
+                task.wait(1)
+                if espEnabled then createESP(p) end
+            end)
+        end)
+
+        Players.PlayerRemoving:Connect(removeESP)
+
+        -- Цикл проверки живых игроков
+        RunService.Heartbeat:Connect(function()
+            if not espEnabled then return end
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    local char = p.Character
+                    if char and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
+                        if not espObjects[p] then createESP(p) end
+                    else
+                        removeESP(p)
+                    end
                 end
-                espDrawings[p] = nil
             end
         end)
     else
-        clearSkeleton()
-        Status.Text = "Skeleton ESP выключен"
+        clearAllESP()
+        Status.Text = "ESP выключен"
     end
 end
 
@@ -203,7 +176,7 @@ ESPBtn.MouseButton1Click:Connect(toggleESP)
 
 -- ================= AIMBOT (клавиша E) =================
 local aimbotEnabled = false
-local aimbotFOV = 100 -- пикселей (радиус)
+local aimbotFOV = 100
 local aimbotConn
 
 local function getClosestTarget()
@@ -243,14 +216,17 @@ local function toggleAimbot()
             end
         end)
     else
-        if aimbotConn then aimbotConn:Disconnect() aimbotConn = nil end
+        if aimbotConn then
+            aimbotConn:Disconnect()
+            aimbotConn = nil
+        end
         Status.Text = "Aimbot выключен"
     end
 end
 
 AimbotBtn.MouseButton1Click:Connect(toggleAimbot)
 
--- ================= AIM FOV (настройка радиуса аимбота) =================
+-- ================= AIM FOV =================
 local aimFovValues = {50, 100, 150, 200, 300}
 local aimFovIndex = 2
 AimFOVBtn.Text = "Aim FOV: " .. aimFovValues[aimFovIndex]
@@ -264,7 +240,7 @@ AimFOVBtn.MouseButton1Click:Connect(function()
     Status.Text = "Aim FOV: " .. aimbotFOV
 end)
 
--- ================= GOD MODE (изменённый) =================
+-- ================= GOD MODE =================
 local godEnabled = false
 local godLoop
 
@@ -275,7 +251,6 @@ local function applyGod()
     if not hum then return end
     hum.MaxHealth = math.huge
     hum.Health = math.huge
-    -- Отключаем урон через ForceField
     if not char:FindFirstChildOfClass("ForceField") then
         local ff = Instance.new("ForceField")
         ff.Visible = false
@@ -289,12 +264,10 @@ local function toggleGod()
     if godEnabled then
         Status.Text = "God Mode включён"
         applyGod()
-        -- Респавн
         LocalPlayer.CharacterAdded:Connect(function()
             task.wait(0.2)
             if godEnabled then applyGod() end
         end)
-        -- Постоянная поддержка
         godLoop = task.spawn(function()
             while godEnabled do
                 task.wait(0.5)
@@ -302,8 +275,10 @@ local function toggleGod()
             end
         end)
     else
-        if godLoop then task.cancel(godLoop) godLoop = nil end
-        -- Убираем ForceField
+        if godLoop then
+            task.cancel(godLoop)
+            godLoop = nil
+        end
         local char = LocalPlayer.Character
         if char then
             for _, obj in ipairs(char:GetChildren()) do
@@ -332,23 +307,6 @@ FOVBtn.MouseButton1Click:Connect(function()
     if camFovIndex > #camFovValues then camFovIndex = 1 end
     Camera.FieldOfView = camFovValues[camFovIndex]
     FOVBtn.Text = "Camera FOV: " .. camFovValues[camFovIndex]
-end)
-
--- ================= ГЛАВНЫЙ ЦИКЛ (ESP 1 раз в секунду) =================
-RunService.Heartbeat:Connect(function()
-    if not espEnabled then return end
-    if tick() - espLastUpdate >= 1 then
-        espLastUpdate = tick()
-        updateSkeleton()
-        -- Создать для новых
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and not espDrawings[p] then
-                createSkeleton(p)
-            end
-        end
-    end
-    -- Отрисовка скелета каждый кадр (для плавности)
-    updateSkeleton()
 end)
 
 Status.Text = "Ryzen Hub v3 загружен | E — аимбот"
