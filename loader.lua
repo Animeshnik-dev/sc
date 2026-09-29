@@ -6,7 +6,8 @@ local Scripts = {
     [142823291]       = "https://raw.githubusercontent.com/Animeshnik-dev/sc/refs/heads/hub/Ryzen.lua",     -- MM2
     [537413528]       = "https://raw.githubusercontent.com/Animeshnik-dev/sc/refs/heads/hub/BABT.lua",      -- Build a Boat
     [136801880565837] = "https://raw.githubusercontent.com/Animeshnik-dev/sc/refs/heads/hub/flick.lua",     -- Flick FPS
-    [17625359962]      = "https://raw.githubusercontent.com/Animeshnik-dev/sc/refs/heads/hub/rivals.lua",    -- Rivals (вставь PlaceId)
+    [17625359962]      = "https://raw.githubusercontent.com/Animeshnik-dev/sc/refs/heads/hub/rivals.lua",-- Rivals (вставь PlaceId)
+    [155615604]]      = "https://raw.githubusercontent.com/Animeshnik-dev/sc/refs/heads/hub/prison%20life.lua", -- Prison Life
 }
 
 local ScriptURL = Scripts[PlaceId]
